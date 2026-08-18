@@ -46,10 +46,10 @@
             <tbody><t t-foreach="groups[0]['periods']" t-as="p"><tr><td><t t-esc="p['period_label']"/></td><td class="num"><t t-esc="p['order_count']"/></td><td class="num"><t t-esc="p['line_count']"/></td><td class="num"><t t-esc="p['qty_total']"/></td><td class="num"><t t-esc="p['subtotal_total']"/></td><td class="num"><t t-esc="p['cost_total']"/></td><td class="num"><t t-esc="p['margin_total']"/></td><td class="num"><t t-esc="p['margin_rate']"/></td></tr></t></tbody>
           </table>
         </t>
-        <t t-elif="report_type == 'aging'">
+        <t t-elif="report_type in ('aging', 'aging_sales', 'aging_delivery', 'aging_invoice')">
           <table class="sha_summary_master">
-            <thead><tr><th>Metric</th><th class="num">0-7 Days</th><th class="num">8-15 Days</th><th class="num">16-30 Days</th><th class="num">31-60 Days</th><th class="num">60+ Days</th></tr></thead>
-            <tbody><t t-foreach="groups[0]['aging_rows']" t-as="r"><tr><td><t t-esc="r['label']"/></td><t t-foreach="r['values']" t-as="v"><td class="num"><t t-esc="v"/></td></t></tr></t></tbody>
+            <thead><tr><th>Product</th><t t-foreach="groups[0]['aging_columns']" t-as="col"><th class="num"><t t-esc="col"/></th></t><th class="num">Total</th></tr></thead>
+            <tbody><t t-foreach="groups[0]['aging_rows']" t-as="r"><tr><td><t t-esc="r['product']"/></td><t t-foreach="r['values']" t-as="v"><td class="num"><t t-esc="v"/></td></t><td class="num"><t t-esc="r['total']"/></td></tr></t></tbody>
           </table>
         </t>
         <t t-elif="report_type == 'summary'">

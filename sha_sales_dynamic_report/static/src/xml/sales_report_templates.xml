@@ -12,17 +12,17 @@
 
       <div class="o_sha_filterbar">
         <div class="o_sha_filters">
-          <div class="o_sha_field"><label>Report Type</label><select t-on-change="(ev) => this.onFilterChange('reportType', ev)"><option value="detail" t-att-selected="state.reportType === 'detail'">Sales Order Details</option><option value="summary" t-att-selected="state.reportType === 'summary'">Sales Summary</option><option value="discount_margin" t-att-selected="state.reportType === 'discount_margin'">Discount and Margin</option><option value="delivery_invoice" t-att-selected="state.reportType === 'delivery_invoice'">Delivery and Invoicing Status</option><option value="day_wise" t-att-selected="state.reportType === 'day_wise'">Sales Day Wise Report</option><option value="trend" t-att-selected="state.reportType === 'trend'">Revenue, Qty and Margin Trend</option><option value="aging" t-att-selected="state.reportType === 'aging'">Aging Report</option></select></div>
+          <div class="o_sha_field"><label>Report Type</label><select t-on-change="(ev) => this.onFilterChange('reportType', ev)"><option value="detail">Sales Order Details</option><option value="summary">Sales Summary</option><option value="discount_margin">Discount and Margin</option><option value="delivery_invoice">Delivery and Invoicing Status</option><option value="day_wise">Sales Day Wise Report</option><option value="trend">Revenue, Qty and Margin Trend</option><option value="aging">Aging Report</option></select></div>
           <t t-if="state.reportType === 'trend' || state.reportType === 'day_wise'"><div class="o_sha_field"><label><t t-if="state.reportType === 'day_wise'">Day Wise By</t><t t-else="">Trend By</t></label><select t-on-change="(ev) => this.onFilterChange('trendPeriod', ev)"><option value="day" t-att-selected="state.trendPeriod === 'day'">Day</option><option value="week" t-att-selected="state.trendPeriod === 'week'">Week</option><option value="month" t-att-selected="state.trendPeriod === 'month'">Month</option></select></div></t>
-          <t t-if="state.reportType === 'aging'"><div class="o_sha_field"><label>Aging Basis</label><select t-on-change="(ev) => this.onFilterChange('agingBucket', ev)"><option value="delivery" t-att-selected="state.agingBucket === 'delivery'">Delivery Aging</option><option value="invoice" t-att-selected="state.agingBucket === 'invoice'">Invoice Aging</option></select></div></t>
+          <t t-if="state.reportType === 'aging'"><div class="o_sha_field"><label>Aging By</label><select t-on-change="(ev) => this.onFilterChange('agingBucket', ev)"><option value="sales">Sales</option><option value="delivery">Delivery</option><option value="invoice">Invoice</option></select></div><div class="o_sha_field"><label>Interval</label><select t-on-change="(ev) => this.onFilterChange('agingInterval', ev)"><option value="7">7 Days</option><option value="15">15 Days</option><option value="30">30 Days</option><option value="60">60 Days</option><option value="90">90 Days</option></select></div></t>
           <div class="o_sha_field" t-if="state.reportType === 'detail' || state.reportType === 'summary'"><label>Group By</label><select t-on-change="(ev) => this.onFilterChange('summaryGroupBy', ev)"><option value="salesperson">Salesperson</option><option value="customer">Customer</option><option value="product">Product</option><option value="category">Product Category</option></select></div>
           <t t-if="state.reportType === 'discount_margin'"><div class="o_sha_field"><label>Margin Options</label><label><input type="checkbox" t-att-checked="state.includeZeroMargin" t-on-change="(ev) => { this.state.includeZeroMargin = ev.target.checked; this.fetchData(); }"/> Include zero margin</label><label><input type="checkbox" t-att-checked="state.includeNegativeMargin" t-on-change="(ev) => { this.state.includeNegativeMargin = ev.target.checked; this.fetchData(); }"/> Include negative margin</label></div></t>
           <t t-if="state.reportType === 'delivery_invoice'"><div class="o_sha_field"><label>Delivery Status</label><select t-on-change="(ev) => { this.state.deliveryStatuses = ev.target.value ? [ev.target.value] : []; this.fetchData(); }"><option value="">All Delivery</option><option value="not_delivered">Not Delivered</option><option value="partially_delivered">Partially Delivered</option><option value="delivered">Delivered</option></select></div><div class="o_sha_field"><label>Invoice Status</label><select t-on-change="(ev) => { this.state.invoiceStatuses = ev.target.value ? [ev.target.value] : []; this.fetchData(); }"><option value="">All Invoicing</option><option value="nothing">Nothing Invoiced</option><option value="to invoice">To Invoice</option><option value="invoiced">Invoiced</option></select></div></t>
-          <div class="o_sha_field">
+          <div class="o_sha_field" t-if="state.reportType !== 'aging'">
             <label>Date From</label>
             <input type="date" t-att-value="state.dateFrom" t-on-change="(ev) => this.onFilterChange('dateFrom', ev)"/>
           </div>
-          <div class="o_sha_field">
+          <div class="o_sha_field" t-if="state.reportType !== 'aging'">
             <label>Date To</label>
             <input type="date" t-att-value="state.dateTo" t-on-change="(ev) => this.onFilterChange('dateTo', ev)"/>
           </div>
@@ -164,8 +164,8 @@
         </t>
         <t t-elif="state.reportType === 'aging'">
           <table class="o_sha_table o_sha_summary_master">
-            <thead><tr><th>Metric</th><t t-foreach="state.groups[0].aging_columns" t-as="col" t-key="col"><th class="num"><t t-esc="col"/></th></t></tr></thead>
-            <tbody><t t-foreach="state.groups[0].aging_rows" t-as="r" t-key="r.label"><tr><td><t t-esc="r.label"/></td><t t-foreach="r.values" t-as="v" t-key="r.label + '-' + v_index"><td class="num"><t t-esc="v"/></td></t></tr></t></tbody>
+            <thead><tr><th>Product</th><t t-foreach="state.groups[0].aging_columns" t-as="col" t-key="col"><th class="num"><t t-esc="col"/></th></t><th class="num">Total</th></tr></thead>
+            <tbody><t t-foreach="state.groups[0].aging_rows" t-as="r" t-key="r.product"><tr><td><t t-esc="r.product"/></td><t t-foreach="r.values" t-as="v" t-key="r.product + '-' + v_index"><td class="num"><t t-esc="v"/></td></t><td class="num"><t t-esc="r.total"/></td></tr></t></tbody>
           </table>
         </t>
         <t t-else="">

@@ -89,7 +89,7 @@ class SalespersonReport(models.AbstractModel):
                         min_discount=False, max_discount=False, min_margin=False, max_margin=False,
                         include_zero_margin=False, include_negative_margin=True,
                         delivery_statuses=None, invoice_statuses=None, trend_period='month',
-                        aging_bucket='delivery'):
+                        aging_bucket='delivery', aging_interval=30):
         salesperson_ids = [int(x) for x in (salesperson_ids or []) if x]
         product_ids = [int(x) for x in (product_ids or []) if x]
         category_ids = [int(x) for x in (category_ids or []) if x]
@@ -129,7 +129,7 @@ class SalespersonReport(models.AbstractModel):
         # relational field property (order_id.date_order). Use the indexed
         # line id for stable, efficient pagination instead.
         lines = line_model.search(domain, order='id desc', offset=offset, limit=limit)
-        if report_type in ('trend', 'day_wise', 'aging'):
+        if report_type in ('trend', 'day_wise', 'aging', 'aging_sales', 'aging_delivery', 'aging_invoice'):
             rows = {}
             for line in line_model.search(domain, order='id desc'):
                 order = line.order_id
@@ -180,26 +180,29 @@ class SalespersonReport(models.AbstractModel):
                         'cost': line_cost,
                         'subtotal': line.price_subtotal,
                     })
-                elif report_type == 'aging':
-                    age_days = max((fields.Date.today() - order.date_order.date()).days, 0)
-                    if age_days <= 7:
-                        key = '0_7'
-                        label = '0-7 Days'
-                    elif age_days <= 15:
-                        key = '8_15'
-                        label = '8-15 Days'
-                    elif age_days <= 30:
-                        key = '16_30'
-                        label = '16-30 Days'
-                    elif age_days <= 60:
-                        key = '31_60'
-                        label = '31-60 Days'
-                    else:
-                        key = '60_plus'
-                        label = '60+ Days'
-                    bucket = rows.setdefault(key, {
+                elif report_type in ('aging', 'aging_sales', 'aging_delivery', 'aging_invoice'):
+                    aging_mode = {'aging': aging_bucket or 'delivery', 'aging_sales': 'sales', 'aging_delivery': 'delivery', 'aging_invoice': 'invoice'}.get(report_type, 'sales')
+                    age_date = order.date_order.date()
+                    if aging_mode == 'delivery' and 'move_ids' in line._fields:
+                        dates = [m.date.date() for m in line.move_ids if m.state == 'done' and m.date]
+                        if dates:
+                            age_date = max(dates)
+                    elif aging_mode == 'invoice' and 'invoice_lines' in line._fields:
+                        dates = [ml.move_id.invoice_date for ml in line.invoice_lines if ml.move_id and ml.move_id.invoice_date]
+                        if dates:
+                            age_date = max(fields.Date.to_date(d) for d in dates)
+                    age_days = max((fields.Date.today() - age_date).days, 0)
+                    interval = max(int(aging_interval or 30), 1)
+                    bucket_no = min(age_days // interval, 5)
+                    key = str(bucket_no)
+                    label = '%s-%s Days' % (bucket_no * interval, (bucket_no + 1) * interval - 1) if bucket_no < 5 else '%s+ Days' % (5 * interval)
+                    product_key = line.product_id.id or 0
+                    row_key = '%s:%s' % (product_key, key)
+                    bucket = rows.setdefault(row_key, {
                         'bucket_key': key,
                         'bucket_label': label,
+                        'product': line.product_id.display_name,
+                        'product_id': product_key,
                         'order_ids': set(),
                         'line_count': 0,
                         'qty_total': 0.0,
@@ -286,46 +289,23 @@ class SalespersonReport(models.AbstractModel):
                     'trend_rows': trend_rows,
                 }]
             else:
-                bucket_order = ['0_7', '8_15', '16_30', '31_60', '60_plus']
-                bucket_labels = {
-                    '0_7': '0-7 Days',
-                    '8_15': '8-15 Days',
-                    '16_30': '16-30 Days',
-                    '31_60': '31-60 Days',
-                    '60_plus': '60+ Days',
-                }
-                metrics = {
-                    'Orders': 'order_count',
-                    'Lines': 'line_count',
-                    'Qty': 'qty_total',
-                    'Delivered': 'delivered_total',
-                    'Invoiced': 'invoiced_total',
-                    'Remaining': 'remaining_total',
-                    'Revenue': 'subtotal_total',
-                    'Margin': 'margin_total',
-                }
+                interval = max(int(aging_interval or 30), 1)
+                bucket_order = [str(i) for i in range(6)]
+                aging_products = {}
+                for item in rows.values():
+                    product = aging_products.setdefault(item['product'], {'product': item['product'], 'values': {k: 0.0 for k in bucket_order}, 'total': 0.0})
+                    product['values'][item['bucket_key']] += item['qty_total']
+                    product['total'] += item['qty_total']
+                aging_rows = [{'product': item['product'], 'values': [item['values'][k] for k in bucket_order], 'total': item['total']} for item in sorted(aging_products.values(), key=lambda x: x['product'].lower())]
+                aging_columns = ['%s-%s' % (i * interval, (i + 1) * interval - 1) if i < 5 else '%s+' % (5 * interval) for i in range(6)]
                 groups = [{
-                    'salesperson': 'Aging',
+                    'salesperson': 'Product Aging',
                     'currency_symbol': '',
                     'currency_position': 'before',
                     'group_key': 'aging:all',
                     'rows': [],
-                    'aging_columns': [bucket_labels[k] for k in bucket_order],
-                    'aging_rows': [{
-                        'label': metric,
-                        'values': [
-                            (rows[k]['order_ids'] and len(rows[k]['order_ids']) or 0) if value_key == 'order_count' and k in rows else
-                            rows[k]['line_count'] if value_key == 'line_count' and k in rows else
-                            rows[k]['qty_total'] if value_key == 'qty_total' and k in rows else
-                            rows[k]['delivered_total'] if value_key == 'delivered_total' and k in rows else
-                            rows[k]['invoiced_total'] if value_key == 'invoiced_total' and k in rows else
-                            rows[k]['remaining_total'] if value_key == 'remaining_total' and k in rows else
-                            rows[k]['subtotal_total'] if value_key == 'subtotal_total' and k in rows else
-                            rows[k]['margin_total'] if value_key == 'margin_total' and k in rows else
-                            0.0
-                            for k in bucket_order
-                        ],
-                    } for metric, value_key in metrics.items()],
+                    'aging_columns': aging_columns,
+                    'aging_rows': aging_rows,
                     'buckets': [{
                         'bucket_key': item['bucket_key'],
                         'bucket_label': item['bucket_label'],
@@ -339,7 +319,7 @@ class SalespersonReport(models.AbstractModel):
                         'invoiced_total': item['invoiced_total'],
                         'remaining_total': item['remaining_total'],
                         'margin_rate': (item['margin_total'] / item['subtotal_total'] * 100) if item['subtotal_total'] else 0.0,
-                    } for item in [rows[k] for k in bucket_order if k in rows]],
+                    } for item in rows.values()],
                 }]
             return {'groups': groups, 'offset': offset, 'limit': limit, 'total_count': total_count, 'has_more': False}
 

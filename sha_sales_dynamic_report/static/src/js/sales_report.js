@@ -14,6 +14,7 @@ class SalespersonReport extends Component {
             summaryGroupBy: "salesperson",
             trendPeriod: "month",
             agingBucket: "delivery",
+            agingInterval: 30,
             darkMode: this.getPreferredDarkMode(),
             dateFrom: this.defaultDateFrom(),
             dateTo: this.today(),
@@ -142,6 +143,7 @@ class SalespersonReport extends Component {
             summary_group_by: this.state.summaryGroupBy,
             trend_period: this.state.trendPeriod,
             aging_bucket: this.state.agingBucket,
+            aging_interval: this.state.agingInterval,
             offset: this.state.offset,
             limit: 200,
         });
@@ -153,7 +155,11 @@ class SalespersonReport extends Component {
 
     onFilterChange(field, ev) {
         this.state[field] = ev.target.value;
-        if (field === "reportType" || field === "summaryGroupBy" || field === "trendPeriod" || field === "agingBucket") this.state.offset = 0;
+        if (field === "reportType" && ev.target.value === "aging") {
+            this.state.dateFrom = "";
+            this.state.dateTo = "";
+        }
+        if (field === "reportType" || field === "summaryGroupBy" || field === "trendPeriod" || field === "agingBucket" || field === "agingInterval") this.state.offset = 0;
         this.fetchData();
     }
 
@@ -240,6 +246,9 @@ class SalespersonReport extends Component {
             day_wise: "Sales Day Wise Report",
             trend: "Revenue, Qty and Margin Trend",
             aging: "Aging Report",
+            aging_sales: "Product Sales Aging",
+            aging_delivery: "Product Delivery Aging",
+            aging_invoice: "Product Invoice Aging",
         };
         const base = titles[this.state.reportType] || "Sales Report";
         return (this.state.reportType === "detail" || this.state.reportType === "summary")

@@ -20,7 +20,7 @@ class SalespersonReportController(http.Controller):
                   min_discount=False, max_discount=False, min_margin=False, max_margin=False,
                   include_zero_margin=False, include_negative_margin=True,
                   delivery_statuses=None, invoice_statuses=None, trend_period='month',
-                  aging_bucket='delivery'):
+                  aging_bucket='delivery', aging_interval=30):
         return request.env['salesperson.report'].get_report_data(
             date_from=date_from or False,
             date_to=date_to or False,
@@ -36,7 +36,7 @@ class SalespersonReportController(http.Controller):
             search=search or '',
             offset=offset, limit=limit,
             report_type=report_type, summary_group_by=summary_group_by,
-            trend_period=trend_period, aging_bucket=aging_bucket,
+            trend_period=trend_period, aging_bucket=aging_bucket, aging_interval=aging_interval,
         )
 
     def _parse_values(self, value):
@@ -72,7 +72,7 @@ class SalespersonReportController(http.Controller):
                     product_ids=None, category_ids=None, customer_ids=None, sale_order_statuses=None, search='', report_type='detail', summary_group_by='salesperson',
                     min_discount=False, max_discount=False, min_margin=False, max_margin=False,
                     include_zero_margin=False, include_negative_margin=True, delivery_statuses=None, invoice_statuses=None,
-                    trend_period='month', aging_bucket='delivery'):
+                    trend_period='month', aging_bucket='delivery', aging_interval=30):
         import xlsxwriter
 
         filter_text = self._filter_text(date_from, date_to, salesperson_ids, product_ids, category_ids, customer_ids, sale_order_statuses, search)
@@ -96,7 +96,7 @@ class SalespersonReportController(http.Controller):
 
         headers = (['Product Name'] if report_type == 'day_wise' else
                    ['Order', 'Date', 'Customer', 'Salesperson', 'Product', 'Quantity', 'Unit Price', 'Discount %', 'Cost', 'Revenue', 'Margin', 'Margin %'] if report_type == 'trend' else
-                   ['Metric'] + ['0-7 Days', '8-15 Days', '16-30 Days', '31-60 Days', '60+ Days'] if report_type == 'aging' else
+                   ['Product'] + ['0-30', '31-60', '61-90', '91-120', '121-150', '150+'] + ['Total'] if report_type == 'aging' else
                    ['Group', 'Currency', 'Orders', 'Lines', 'Qty', 'Subtotal'] if report_type == 'summary' else
                    ['Order', 'Date', 'Customer', 'Product', 'Qty', 'Sales Price', 'Discount %', 'Cost', 'Margin', 'Margin %', 'Revenue'] if report_type == 'discount_margin' else
                    ['Order', 'Date', 'Customer', 'Product', 'Ordered Qty', 'Delivered Qty', 'Invoiced Qty', 'Remaining Qty', 'Delivery Status', 'Invoice Status'] if report_type == 'delivery_invoice' else
@@ -116,11 +116,11 @@ class SalespersonReportController(http.Controller):
                                   min_margin=min_margin, max_margin=max_margin,
                                   include_zero_margin=include_zero_margin, include_negative_margin=include_negative_margin,
                                   delivery_statuses=delivery_statuses, invoice_statuses=invoice_statuses,
-                                  trend_period=trend_period, aging_bucket=aging_bucket)
+                                  trend_period=trend_period, aging_bucket=aging_bucket, aging_interval=aging_interval)
             if not data['groups']:
                 break
             for group in data['groups']:
-                title = '%s (%s)' % (group['salesperson'], group['currency_symbol']) if report_type not in ('trend', 'aging', 'day_wise') else group['salesperson']
+                title = '%s (%s)' % (group['salesperson'], group['currency_symbol']) if report_type not in ('trend', 'aging', 'aging_sales', 'aging_delivery', 'aging_invoice', 'day_wise') else group['salesperson']
                 sheet.write(row, 0, title, group_fmt)
                 row += 1
                 if report_type == 'day_wise':
@@ -151,9 +151,7 @@ class SalespersonReportController(http.Controller):
                     continue
                 if report_type == 'aging':
                     for metric in group.get('aging_rows', []):
-                        sheet.write(row, 0, metric['label'])
-                        for col, value in enumerate(metric.get('values', []), start=1):
-                            sheet.write(row, col, value)
+                        sheet.write_row(row, 0, [metric['product']] + metric['values'] + [metric['total']])
                         row += 1
                     row += 1
                     continue
@@ -199,7 +197,7 @@ class SalespersonReportController(http.Controller):
                    product_ids=None, category_ids=None, customer_ids=None, sale_order_statuses=None, search='', report_type='detail', summary_group_by='salesperson',
                    min_discount=False, max_discount=False, min_margin=False, max_margin=False,
                    include_zero_margin=False, include_negative_margin=True, delivery_statuses=None, invoice_statuses=None,
-                   trend_period='month', aging_bucket='delivery'):
+                   trend_period='month', aging_bucket='delivery', aging_interval=30):
         data = self._get_data(date_from, date_to, salesperson_ids, product_ids, category_ids,
                               customer_ids, sale_order_statuses, search, limit=500,
                               report_type=report_type, summary_group_by=summary_group_by,
@@ -207,7 +205,7 @@ class SalespersonReportController(http.Controller):
                               min_margin=min_margin, max_margin=max_margin,
                               include_zero_margin=include_zero_margin, include_negative_margin=include_negative_margin,
                               delivery_statuses=delivery_statuses, invoice_statuses=invoice_statuses,
-                              trend_period=trend_period, aging_bucket=aging_bucket)
+                              trend_period=trend_period, aging_bucket=aging_bucket, aging_interval=aging_interval)
 
         filter_text = self._filter_text(date_from, date_to, salesperson_ids, product_ids, category_ids, customer_ids, sale_order_statuses, search)
 
