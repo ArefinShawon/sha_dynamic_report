@@ -1,0 +1,231 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<templates xml:space="preserve">
+  <t t-name="salesperson_report.SalespersonReportTemplate" owl="1">
+    <div t-attf-class="o_sha_sales_report {{ state.darkMode ? 'o_sha_dark' : '' }}">
+      <div class="o_sha_header">
+        <div>
+          <h2 class="o_sha_title"><t t-esc="reportTitle"/></h2>
+          <!-- <div class="o_sha_subtitle">Group sales lines by salesperson with quick filtering and export.</div> -->
+        </div>
+        <button type="button" class="o_sha_theme_toggle" t-on-click="toggleDarkMode"><i t-attf-class="fa {{ state.darkMode ? 'fa-sun-o' : 'fa-moon-o' }}"/><span><t t-if="state.darkMode">Light</t><t t-else="">Dark</t></span></button>
+      </div>
+
+      <div class="o_sha_filterbar">
+        <div class="o_sha_filters">
+          <div class="o_sha_field"><label>Report Type</label><select t-on-change="(ev) => this.onFilterChange('reportType', ev)"><option value="detail" t-att-selected="state.reportType === 'detail'">Sales Order Details</option><option value="summary" t-att-selected="state.reportType === 'summary'">Sales Summary</option><option value="discount_margin" t-att-selected="state.reportType === 'discount_margin'">Discount and Margin</option><option value="delivery_invoice" t-att-selected="state.reportType === 'delivery_invoice'">Delivery and Invoicing Status</option><option value="day_wise" t-att-selected="state.reportType === 'day_wise'">Sales Day Wise Report</option><option value="trend" t-att-selected="state.reportType === 'trend'">Revenue, Qty and Margin Trend</option><option value="aging" t-att-selected="state.reportType === 'aging'">Aging Report</option></select></div>
+          <t t-if="state.reportType === 'trend' || state.reportType === 'day_wise'"><div class="o_sha_field"><label><t t-if="state.reportType === 'day_wise'">Day Wise By</t><t t-else="">Trend By</t></label><select t-on-change="(ev) => this.onFilterChange('trendPeriod', ev)"><option value="day" t-att-selected="state.trendPeriod === 'day'">Day</option><option value="week" t-att-selected="state.trendPeriod === 'week'">Week</option><option value="month" t-att-selected="state.trendPeriod === 'month'">Month</option></select></div></t>
+          <t t-if="state.reportType === 'aging'"><div class="o_sha_field"><label>Aging Basis</label><select t-on-change="(ev) => this.onFilterChange('agingBucket', ev)"><option value="delivery" t-att-selected="state.agingBucket === 'delivery'">Delivery Aging</option><option value="invoice" t-att-selected="state.agingBucket === 'invoice'">Invoice Aging</option></select></div></t>
+          <div class="o_sha_field" t-if="state.reportType === 'detail' || state.reportType === 'summary'"><label>Group By</label><select t-on-change="(ev) => this.onFilterChange('summaryGroupBy', ev)"><option value="salesperson">Salesperson</option><option value="customer">Customer</option><option value="product">Product</option><option value="category">Product Category</option></select></div>
+          <t t-if="state.reportType === 'discount_margin'"><div class="o_sha_field"><label>Margin Options</label><label><input type="checkbox" t-att-checked="state.includeZeroMargin" t-on-change="(ev) => { this.state.includeZeroMargin = ev.target.checked; this.fetchData(); }"/> Include zero margin</label><label><input type="checkbox" t-att-checked="state.includeNegativeMargin" t-on-change="(ev) => { this.state.includeNegativeMargin = ev.target.checked; this.fetchData(); }"/> Include negative margin</label></div></t>
+          <t t-if="state.reportType === 'delivery_invoice'"><div class="o_sha_field"><label>Delivery Status</label><select t-on-change="(ev) => { this.state.deliveryStatuses = ev.target.value ? [ev.target.value] : []; this.fetchData(); }"><option value="">All Delivery</option><option value="not_delivered">Not Delivered</option><option value="partially_delivered">Partially Delivered</option><option value="delivered">Delivered</option></select></div><div class="o_sha_field"><label>Invoice Status</label><select t-on-change="(ev) => { this.state.invoiceStatuses = ev.target.value ? [ev.target.value] : []; this.fetchData(); }"><option value="">All Invoicing</option><option value="nothing">Nothing Invoiced</option><option value="to invoice">To Invoice</option><option value="invoiced">Invoiced</option></select></div></t>
+          <div class="o_sha_field">
+            <label>Date From</label>
+            <input type="date" t-att-value="state.dateFrom" t-on-change="(ev) => this.onFilterChange('dateFrom', ev)"/>
+          </div>
+          <div class="o_sha_field">
+            <label>Date To</label>
+            <input type="date" t-att-value="state.dateTo" t-on-change="(ev) => this.onFilterChange('dateTo', ev)"/>
+          </div>
+          <div class="o_sha_field">
+            <label>Salesperson</label>
+            <div class="o_sha_multi">
+              <button type="button" class="o_sha_multi_btn" t-on-click="() => this.toggleDropdown('salespersonIds')">
+                <t t-if="state.salespersonIds.length === 0">All Salespersons</t>
+                <t t-else=""><t t-esc="state.salespersonIds.length"/> selected</t>
+              </button>
+              <div class="o_sha_multi_menu" t-if="state.salespersonDropdown">
+                <div class="o_sha_multi_searchwrap">
+                  <input type="text"
+                         class="o_sha_multi_search"
+                         placeholder="Search salesperson..."
+                         t-att-value="state.salespersonSearch"
+                         t-on-input="(ev) => this.onMultiSearchInput('salespersonSearch', ev)"/>
+                  <button type="button" class="o_sha_multi_searchclear" t-on-click="() => this.clearMultiSearch('salespersonSearch')"><i class="fa fa-times"/></button>
+                </div>
+                <t t-if="filteredSalespersons.length === 0">
+                  <div class="o_sha_multi_empty">No salesperson found</div>
+                </t>
+                <t t-foreach="filteredSalespersons" t-as="s" t-key="s.id">
+                  <label class="o_sha_multi_item">
+                    <input type="checkbox"
+                           t-att-checked="state.salespersonIds.includes(s.id)"
+                           t-on-change="() => this.toggleMulti('salespersonIds', s.id)"/>
+                    <span><t t-esc="s.name"/></span>
+                  </label>
+                </t>
+                <button type="button" class="o_sha_multi_clear" t-on-click="() => this.clearMulti('salespersonIds')">Clear</button>
+              </div>
+            </div>
+          </div>
+          <div class="o_sha_field">
+            <label>Product</label>
+            <div class="o_sha_multi">
+              <button type="button" class="o_sha_multi_btn" t-on-click="() => this.toggleDropdown('productIds')">
+                <t t-if="state.productIds.length === 0">All Products</t>
+                <t t-else=""><t t-esc="state.productIds.length"/> selected</t>
+              </button>
+              <div class="o_sha_multi_menu" t-if="state.productDropdown">
+                <div class="o_sha_multi_searchwrap">
+                  <input type="text"
+                         class="o_sha_multi_search"
+                         placeholder="Search product..."
+                         t-att-value="state.productSearch"
+                         t-on-input="(ev) => this.onMultiSearchInput('productSearch', ev)"/>
+                  <button type="button" class="o_sha_multi_searchclear" t-on-click="() => this.clearMultiSearch('productSearch')"><i class="fa fa-times"/></button>
+                </div>
+                <t t-if="filteredProducts.length === 0">
+                  <div class="o_sha_multi_empty">No product found</div>
+                </t>
+                <t t-foreach="filteredProducts" t-as="p" t-key="p.id">
+                  <label class="o_sha_multi_item">
+                    <input type="checkbox"
+                           t-att-checked="state.productIds.includes(p.id)"
+                           t-on-change="() => this.toggleMulti('productIds', p.id)"/>
+                    <span><t t-esc="p.display_name"/></span>
+                  </label>
+                </t>
+                <button type="button" class="o_sha_multi_clear" t-on-click="() => this.clearMulti('productIds')">Clear</button>
+              </div>
+            </div>
+          </div>
+          <div class="o_sha_field">
+            <label>Customer</label>
+            <div class="o_sha_multi"><button type="button" class="o_sha_multi_btn" t-on-click="() => this.toggleDropdown('customerIds')"><t t-if="!state.customerIds.length">All Customers</t><t t-else=""><t t-esc="state.customerIds.length"/> selected</t></button><div class="o_sha_multi_menu" t-if="state.customerIdsDropdown"><div class="o_sha_multi_searchwrap"><input type="text" class="o_sha_multi_search" placeholder="Search customer..." t-att-value="state.customerSearch" t-on-input="(ev) => this.onMultiSearchInput('customerSearch', ev)"/><button type="button" class="o_sha_multi_searchclear" t-on-click="() => this.clearMultiSearch('customerSearch')"><i class="fa fa-times"/></button></div><t t-if="filteredCustomers.length === 0"><div class="o_sha_multi_empty">No customer found</div></t><t t-foreach="filteredCustomers" t-as="customer" t-key="customer.id"><label class="o_sha_multi_item"><input type="checkbox" t-att-checked="state.customerIds.includes(customer.id)" t-on-change="() => this.toggleMulti('customerIds', customer.id)"/><span><t t-esc="customer.display_name"/></span></label></t><button type="button" class="o_sha_multi_clear" t-on-click="() => this.clearMulti('customerIds')">Clear</button></div></div>
+          </div>
+          <div class="o_sha_field">
+            <label>Sale Status</label>
+            <div class="o_sha_multi o_sha_static_multi">
+              <button type="button" class="o_sha_multi_btn" t-on-click="() => this.toggleDropdown('saleOrderStatuses')"><t t-if="!state.saleOrderStatuses.length">All Statuses</t><t t-else=""><t t-esc="state.saleOrderStatuses.length"/> selected</t></button>
+              <div class="o_sha_multi_menu" t-if="state.saleOrderStatusesDropdown">
+                <t t-foreach="state.statuses" t-as="status" t-key="status[0]"><label class="o_sha_multi_item"><input type="checkbox" t-att-checked="state.saleOrderStatuses.includes(status[0])" t-on-change="() => this.toggleMulti('saleOrderStatuses', status[0])"/><span><t t-esc="status[1]"/></span></label></t>
+                <button type="button" class="o_sha_multi_clear" t-on-click="() => this.clearMulti('saleOrderStatuses')">Clear</button>
+              </div>
+            </div>
+          </div>
+          <div class="o_sha_field">
+            <label>Product Category</label>
+            <div class="o_sha_multi"><button type="button" class="o_sha_multi_btn" t-on-click="() => this.toggleDropdown('categoryIds')"><t t-if="!state.categoryIds.length">All Categories</t><t t-else=""><t t-esc="state.categoryIds.length"/> selected</t></button><div class="o_sha_multi_menu" t-if="state.categoryIdsDropdown"><div class="o_sha_multi_searchwrap"><input type="text" class="o_sha_multi_search" placeholder="Search category..." t-att-value="state.categorySearch" t-on-input="(ev) => this.onMultiSearchInput('categorySearch', ev)"/><button type="button" class="o_sha_multi_searchclear" t-on-click="() => this.clearMultiSearch('categorySearch')"><i class="fa fa-times"/></button></div><t t-if="filteredCategories.length === 0"><div class="o_sha_multi_empty">No category found</div></t><t t-foreach="filteredCategories" t-as="category" t-key="category.id"><label class="o_sha_multi_item"><input type="checkbox" t-att-checked="state.categoryIds.includes(category.id)" t-on-change="() => this.toggleMulti('categoryIds', category.id)"/><span><t t-esc="category.display_name"/></span></label></t><button type="button" class="o_sha_multi_clear" t-on-click="() => this.clearMulti('categoryIds')">Clear</button></div></div>
+          </div>
+        </div>
+
+        <div class="o_sha_activefilters">
+          <span class="o_sha_af_label">Active filters:</span>
+          <t t-if="activeFilters.length === 0">
+            <span class="o_sha_af_none">None</span>
+          </t>
+          <t t-foreach="activeFilters" t-as="f" t-key="f.key">
+            <span class="o_sha_chip" t-on-click="() => this.removeFilter(f.key)">
+              <t t-esc="f.label"/> <i class="fa fa-times"/>
+            </span>
+          </t>
+          <t t-if="activeFilters.length > 0">
+            <a class="o_sha_clearall" t-on-click="clearAll">Clear all</a>
+          </t>
+        </div>
+      </div>
+
+      <div class="o_sha_toolbar">
+        <input class="o_sha_search" type="text" placeholder="Search order, customer, salesperson, product…" t-att-value="state.search" t-on-input="onSearchInput"/>
+        <button class="o_sha_btn o_sha_btn_excel" t-on-click="exportExcel"><i class="fa fa-file-excel-o"/> <span>Excel</span></button>
+        <button class="o_sha_btn o_sha_btn_pdf" t-on-click="exportPdf"><i class="fa fa-file-pdf-o"/> <span>PDF</span></button>
+      </div>
+
+      <div class="o_sha_results">
+        <t t-if="state.loading">
+          <div class="o_sha_loading">Loading…</div>
+        </t>
+        <t t-elif="state.groups.length === 0">
+          <div class="o_sha_empty">No sales orders match the current filters.</div>
+        </t>
+        <t t-elif="state.reportType === 'summary'">
+          <table class="o_sha_table o_sha_summary_master">
+            <thead><tr><th>Group</th><th>Currency</th><th class="num">Orders</th><th class="num">Lines</th><th class="num">Quantity</th><th class="num">Subtotal</th></tr></thead>
+            <tbody><t t-foreach="state.groups" t-as="g" t-key="g.group_key"><tr><td><t t-esc="g.salesperson"/></td><td><t t-esc="g.currency_symbol"/></td><td class="num"><t t-esc="g.order_count"/></td><td class="num"><t t-esc="g.line_count"/></td><td class="num"><t t-esc="g.qty_total"/></td><td class="num"><t t-esc="fmtMoney(g.subtotal_total, g.currency_symbol, g.currency_position)"/></td></tr></t></tbody>
+          </table>
+        </t>
+        <t t-elif="state.reportType === 'day_wise'">
+          <table class="o_sha_table o_sha_summary_master">
+            <thead><tr><th>Product Name</th><t t-foreach="state.groups[0].day_columns" t-as="col" t-key="col"><th class="num"><t t-esc="col"/></th></t><th class="num">Total</th></tr></thead>
+            <tbody>
+              <t t-foreach="state.groups[0].day_rows" t-as="r" t-key="r.product">
+                <tr>
+                  <td><t t-esc="r.product"/></td>
+                  <t t-foreach="r.values" t-as="v" t-key="r.product + '-' + v_index"><td class="num"><t t-esc="v"/></td></t>
+                  <td class="num"><b><t t-esc="r.total"/></b></td>
+                </tr>
+              </t>
+              <tr>
+                <td><b>Total</b></td>
+                <t t-foreach="state.groups[0].day_totals" t-as="v" t-key="'total-' + v_index"><td class="num"><b><t t-esc="v"/></b></td></t>
+                <td class="num"><b><t t-esc="state.groups[0].day_grand_total"/></b></td>
+              </tr>
+            </tbody>
+          </table>
+        </t>
+        <t t-elif="state.reportType === 'aging'">
+          <table class="o_sha_table o_sha_summary_master">
+            <thead><tr><th>Metric</th><t t-foreach="state.groups[0].aging_columns" t-as="col" t-key="col"><th class="num"><t t-esc="col"/></th></t></tr></thead>
+            <tbody><t t-foreach="state.groups[0].aging_rows" t-as="r" t-key="r.label"><tr><td><t t-esc="r.label"/></td><t t-foreach="r.values" t-as="v" t-key="r.label + '-' + v_index"><td class="num"><t t-esc="v"/></td></t></tr></t></tbody>
+          </table>
+        </t>
+        <t t-else="">
+          <t t-foreach="state.groups" t-as="g" t-key="g.group_key">
+            <div class="o_sha_group">
+              <div class="o_sha_group_header" t-on-click="() => this.toggleGroupIfDetail(g.group_key)">
+                <i t-if="state.reportType === 'detail'" t-attf-class="fa {{ state.collapsed[g.group_key] ? 'fa-caret-right' : 'fa-caret-down' }}"/>
+                <span class="o_sha_group_name"><t t-esc="g.salesperson"/></span>
+                <div class="o_sha_group_summary">
+                  <span class="o_sha_summary_pill o_sha_summary_money">Orders: <t t-esc="g.order_count"/></span>
+                  <span class="o_sha_summary_pill o_sha_summary_money">Lines: <t t-esc="g.line_count"/></span>
+                  <span class="o_sha_summary_pill o_sha_summary_money">Qty: <t t-esc="g.qty_total"/></span>
+                  <span class="o_sha_summary_pill o_sha_summary_money">Total: <t t-esc="fmtMoney(g.subtotal_total, g.currency_symbol, g.currency_position)"/></span>
+                </div>
+              </div>
+              <t t-if="state.reportType === 'summary' || !state.collapsed[g.group_key]">
+                <table class="o_sha_table" t-if="state.reportType === 'summary'">
+                  <thead><tr><th>Group</th><th>Currency</th><th class="num">Orders</th><th class="num">Lines</th><th class="num">Quantity</th><th class="num">Subtotal</th></tr></thead>
+                  <tbody><tr><td><t t-esc="g.salesperson"/></td><td><t t-esc="g.currency_symbol"/></td><td class="num"><t t-esc="g.order_count"/></td><td class="num"><t t-esc="g.line_count"/></td><td class="num"><t t-esc="g.qty_total"/></td><td class="num"><t t-esc="fmtMoney(g.subtotal_total, g.currency_symbol, g.currency_position)"/></td></tr></tbody>
+                </table>
+                <table class="o_sha_table" t-else="">
+                  <thead>
+                    <tr>
+                      <th>Order</th>
+                      <th>Date</th>
+                      <th>Customer</th>
+                      <t t-if="state.reportType !== 'discount_margin' and state.reportType !== 'delivery_invoice'"><th>Salesperson</th><th>Order Status</th></t>
+                      <th>Product</th>
+                      <t t-if="state.reportType !== 'discount_margin' and state.reportType !== 'delivery_invoice'"><th>Category</th><th>UoM</th></t>
+                      <th class="num"><t t-if="state.reportType === 'delivery_invoice'">Ordered Qty</t><t t-else="">Quantity</t></th>
+                      <t t-if="state.reportType === 'discount_margin'"><th class="num">Sales Price</th><th class="num">Discount %</th><th class="num">Cost</th><th class="num">Margin</th><th class="num">Margin %</th></t>
+                      <t t-elif="state.reportType === 'delivery_invoice'"><th class="num">Delivered</th><th class="num">Invoiced</th><th class="num">Remaining</th><th>Delivery</th><th>Invoice</th></t>
+                      <t t-else=""><th class="num">Unit Price</th><th class="num">Discount %</th><th>Taxes</th></t>
+                      <th t-if="state.reportType !== 'delivery_invoice'" class="num"><t t-if="state.reportType === 'discount_margin'">Revenue</t><t t-else="">Subtotal</t></th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <t t-foreach="g.rows" t-as="row" t-key="row.order_name + row.product + row.date_order">
+                      <tr>
+                        <td><a t-att-href="'/web#id=' + row.order_id + '&amp;model=sale.order&amp;view_type=form'"><t t-esc="row.order_name"/></a></td>
+                        <td><t t-esc="row.date_order"/></td>
+                        <td><t t-esc="row.customer"/></td>
+                        <t t-if="state.reportType !== 'discount_margin' and state.reportType !== 'delivery_invoice'"><td><t t-esc="row.salesperson"/></td><td><t t-esc="row.state"/></td></t>
+                        <td><t t-esc="row.product"/></td>
+                        <t t-if="state.reportType !== 'discount_margin' and state.reportType !== 'delivery_invoice'"><td><t t-esc="row.category"/></td><td><t t-esc="row.uom"/></td></t>
+                        <td class="num"><t t-esc="row.qty"/></td>
+                        <t t-if="state.reportType === 'discount_margin'"><td class="num"><t t-esc="fmtMoney(row.unit_price, g.currency_symbol, g.currency_position)"/></td><td class="num"><t t-esc="fmtNumber(row.discount)"/></td><td class="num"><t t-esc="fmtMoney(row.cost, g.currency_symbol, g.currency_position)"/></td><td class="num"><t t-esc="fmtMoney(row.subtotal - row.cost, g.currency_symbol, g.currency_position)"/></td><td class="num"><t t-esc="row.cost ? fmtNumber(((row.subtotal - row.cost) / row.cost) * 100) : 'N/A'"/></td></t>
+                        <t t-elif="state.reportType === 'delivery_invoice'"><td class="num"><t t-esc="row.delivered_qty"/></td><td class="num"><t t-esc="row.invoiced_qty"/></td><td class="num"><t t-esc="row.remaining_qty"/></td><td><t t-esc="row.delivery_status"/></td><td><t t-esc="row.invoice_status"/></td></t>
+                        <t t-else=""><td class="num"><t t-esc="fmtMoney(row.unit_price, g.currency_symbol, g.currency_position)"/></td><td class="num"><t t-esc="row.discount"/></td><td><t t-esc="row.taxes"/></td></t>
+                        <td t-if="state.reportType !== 'delivery_invoice'" class="num"><t t-esc="fmtMoney(row.subtotal, g.currency_symbol, g.currency_position)"/></td>
+                      </tr>
+                    </t>
+                  </tbody>
+                </table>
+              </t>
+            </div>
+          </t>
+        </t>
+      </div>
+      <div class="o_sha_pager"><button t-on-click="previousPage" t-att-disabled="state.offset === 0">Previous</button><span><t t-esc="state.offset + 1"/>–<t t-esc="Math.min(state.offset + 200, state.totalCount)"/> / <t t-esc="state.totalCount"/></span><button t-on-click="nextPage" t-att-disabled="!state.hasMore">Next</button></div>
+    </div>
+  </t>
+</templates>

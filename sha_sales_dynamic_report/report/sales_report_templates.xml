@@ -1,0 +1,115 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<odoo>
+  <template id="salesperson_report_pdf">
+    <div class="sha_pdf_document">
+      <style>
+        @page { size: A4 landscape; margin: 0; }
+        html, body { margin: 0 !important; padding: 0 !important; }
+        .sha_pdf_document { font-family: Arial, sans-serif; color: #202938; font-size: 8px; margin: 0; padding: 0 10mm; box-sizing: border-box; width: 100%; }
+        .sha_pdf h2 { font-size: 16px; margin: 0 0 3px 0; }
+        .sha_pdf .sha_filters { color: #555; margin-bottom: 2px; }
+        .sha_pdf .sha_exported { color: #777; margin-bottom: 8px; }
+        .sha_pdf_group { page-break-inside: avoid; margin: 0 0 10px; }
+        .sha_pdf_group_header { background: #eaf2ff; padding: 5px 6px; font-weight: bold; }
+        .sha_pdf table { width: 100%; border-collapse: collapse; margin-top: 3px; }
+        .sha_pdf th, .sha_pdf td { border: 1px solid #d0d3d8; padding: 3px 5px; text-align: left; }
+        .sha_pdf th { background: #f0f3f7; font-weight: bold; }
+        .sha_summary_master { margin-top: 6px; }
+        .sha_summary_master td { padding: 6px 7px; }
+        .sha_summary_master td:first-child { font-weight: bold; }
+        .sha_pdf td.num, .sha_pdf th.num { text-align: right; }
+      </style>
+
+      <div class="sha_pdf">
+        <h2><t t-esc="report_title"/></h2>
+        <div class="sha_filters">
+          <span t-esc="filters"/>
+        </div>
+        <div class="sha_exported">Exported: <span t-esc="exported_at"/></div>
+
+        <t t-if="not groups">
+          <p>No sales orders match the current filters.</p>
+        </t>
+
+        <t t-elif="report_type == 'day_wise'">
+          <table class="sha_summary_master">
+            <thead><tr><th>Product Name</th><t t-foreach="groups[0]['day_columns']" t-as="col" t-key="col"><th class="num"><t t-esc="col"/></th></t><th class="num">Total</th></tr></thead>
+            <tbody>
+              <t t-foreach="groups[0]['day_rows']" t-as="r" t-key="r['product']"><tr><td><t t-esc="r['product']"/></td><t t-foreach="r['values']" t-as="v" t-key="r['product'] + '-' + v_index"><td class="num"><t t-esc="v"/></td></t><td class="num"><b><t t-esc="r['total']"/></b></td></tr></t>
+              <tr><td><b>Total</b></td><t t-foreach="groups[0]['day_totals']" t-as="v" t-key="'total-' + v_index"><td class="num"><b><t t-esc="v"/></b></td></t><td class="num"><b><t t-esc="groups[0]['day_grand_total']"/></b></td></tr>
+            </tbody>
+          </table>
+        </t>
+        <t t-elif="report_type == 'trend'">
+          <table class="sha_summary_master">
+            <thead><tr><th>Period</th><th class="num">Orders</th><th class="num">Lines</th><th class="num">Qty</th><th class="num">Revenue</th><th class="num">Cost</th><th class="num">Margin</th><th class="num">Margin %</th></tr></thead>
+            <tbody><t t-foreach="groups[0]['periods']" t-as="p"><tr><td><t t-esc="p['period_label']"/></td><td class="num"><t t-esc="p['order_count']"/></td><td class="num"><t t-esc="p['line_count']"/></td><td class="num"><t t-esc="p['qty_total']"/></td><td class="num"><t t-esc="p['subtotal_total']"/></td><td class="num"><t t-esc="p['cost_total']"/></td><td class="num"><t t-esc="p['margin_total']"/></td><td class="num"><t t-esc="p['margin_rate']"/></td></tr></t></tbody>
+          </table>
+        </t>
+        <t t-elif="report_type == 'aging'">
+          <table class="sha_summary_master">
+            <thead><tr><th>Metric</th><th class="num">0-7 Days</th><th class="num">8-15 Days</th><th class="num">16-30 Days</th><th class="num">31-60 Days</th><th class="num">60+ Days</th></tr></thead>
+            <tbody><t t-foreach="groups[0]['aging_rows']" t-as="r"><tr><td><t t-esc="r['label']"/></td><t t-foreach="r['values']" t-as="v"><td class="num"><t t-esc="v"/></td></t></tr></t></tbody>
+          </table>
+        </t>
+        <t t-elif="report_type == 'summary'">
+          <table class="sha_summary_master">
+            <thead><tr><th>Group</th><th>Currency</th><th class="num">Orders</th><th class="num">Lines</th><th class="num">Quantity</th><th class="num">Subtotal</th></tr></thead>
+            <tbody><t t-foreach="groups" t-as="g"><tr><td><t t-esc="g['salesperson']"/></td><td><t t-esc="g['currency_symbol']"/></td><td class="num"><t t-esc="g['order_count']"/></td><td class="num"><t t-esc="g['line_count']"/></td><td class="num"><t t-esc="g['qty_total']"/></td><td class="num"><t t-esc="g['subtotal_total']"/></td></tr></t></tbody>
+          </table>
+        </t>
+        <t t-else="">
+          <t t-foreach="groups" t-as="g">
+            <div class="sha_pdf_group">
+              <div class="sha_pdf_group_header">
+                <t t-esc="g['salesperson']"/>
+                <span class="sha_pdf_group_summary">
+                  <t t-esc="g['order_count']"/> orders |
+                  <t t-esc="g['line_count']"/> lines |
+                  <t t-esc="g['qty_total']"/> qty |
+                  <t t-if="g['currency_position'] == 'before'"><t t-esc="g['currency_symbol']"/></t><t t-esc="g['subtotal_total']"/><t t-if="g['currency_position'] == 'after'"><t t-esc="g['currency_symbol']"/></t> subtotal
+                </span>
+              </div>
+              <table t-if="report_type == 'summary'">
+                <thead><tr><th>Group</th><th>Currency</th><th class="num">Orders</th><th class="num">Lines</th><th class="num">Quantity</th><th class="num">Subtotal</th></tr></thead>
+                <tbody><tr><td><t t-esc="g['salesperson']"/></td><td><t t-esc="g['currency_symbol']"/></td><td class="num"><t t-esc="g['order_count']"/></td><td class="num"><t t-esc="g['line_count']"/></td><td class="num"><t t-esc="g['qty_total']"/></td><td class="num"><t t-esc="g['subtotal_total']"/></td></tr></tbody>
+              </table>
+              <table t-else="">
+                <thead>
+                  <tr>
+                    <th>Order</th>
+                    <th>Date</th>
+                    <th>Customer</th>
+                    <t t-if="report_type != 'discount_margin' and report_type != 'delivery_invoice'"><th>Salesperson</th><th>Company</th><th>Currency</th><th>Status</th></t>
+                    <th>Product</th>
+                    <t t-if="report_type != 'discount_margin' and report_type != 'delivery_invoice'"><th>Category</th><th>UoM</th></t>
+                    <th class="num"><t t-if="report_type == 'delivery_invoice'">Ordered Qty</t><t t-else="">Quantity</t></th>
+                    <t t-if="report_type == 'discount_margin'"><th class="num">Sales Price</th><th class="num">Discount %</th><th class="num">Cost</th><th class="num">Margin</th><th class="num">Margin %</th><th class="num">Revenue</th></t>
+                    <t t-elif="report_type == 'delivery_invoice'"><th class="num">Delivered</th><th class="num">Invoiced</th><th class="num">Remaining</th><th>Delivery</th><th>Invoice</th></t>
+                    <t t-else=""><th class="num">Unit Price</th><th class="num">Discount %</th><th>Taxes</th><th class="num">Subtotal</th></t>
+                  </tr>
+                </thead>
+                <tbody>
+                  <t t-foreach="g['rows']" t-as="row">
+                    <tr>
+                      <td><t t-esc="row['order_name']"/></td>
+                      <td><t t-esc="row['date_order']"/></td>
+                      <td><t t-esc="row['customer']"/></td>
+                      <t t-if="report_type != 'discount_margin' and report_type != 'delivery_invoice'"><td><t t-esc="row['salesperson']"/></td><td><t t-esc="row['company']"/></td><td><t t-esc="row['currency']"/></td><td><t t-esc="row['state']"/></td></t>
+                      <td><t t-esc="row['product']"/></td>
+                      <t t-if="report_type != 'discount_margin' and report_type != 'delivery_invoice'"><td><t t-esc="row['category']"/></td><td><t t-esc="row['uom']"/></td></t>
+                      <td class="num"><t t-esc="row['qty']"/></td>
+                      <t t-if="report_type == 'discount_margin'"><td class="num"><t t-esc="row['unit_price']"/></td><td class="num"><t t-esc="'%.2f' % row['discount']"/></td><td class="num"><t t-esc="row['cost']"/></td><td class="num"><t t-esc="row['subtotal'] - row['cost']"/></td><td class="num"><t t-esc="'%.2f' % (((row['subtotal'] - row['cost']) / row['cost']) * 100) if row['cost'] else 'N/A'"/></td><td class="num"><t t-esc="row['subtotal']"/></td></t>
+                      <t t-elif="report_type == 'delivery_invoice'"><td class="num"><t t-esc="row['delivered_qty']"/></td><td class="num"><t t-esc="row['invoiced_qty']"/></td><td class="num"><t t-esc="row['remaining_qty']"/></td><td><t t-esc="row['delivery_status']"/></td><td><t t-esc="row['invoice_status']"/></td></t>
+                      <t t-else=""><td class="num"><t t-esc="row['unit_price']"/></td><td class="num"><t t-esc="row['discount']"/></td><td><t t-esc="row['taxes']"/></td><td class="num"><t t-esc="row['subtotal']"/></td></t>
+                    </tr>
+                  </t>
+                </tbody>
+              </table>
+            </div>
+          </t>
+        </t>
+      </div>
+    </div>
+  </template>
+</odoo>

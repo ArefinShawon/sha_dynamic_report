@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<odoo>
+
+    <record id="action_salesperson_report" model="ir.actions.client">
+        <field name="name">Sales Report</field>
+        <field name="tag">sha_salesperson_report_action</field>
+    </record>
+
+    <menuitem id="sha_dynamic_sales_report_menu"
+            name="Dynamic Sales Report"
+            parent="sale.menu_sale_report"
+            sequence="100"/>
+
+    <menuitem id="menu_salesperson_sales_report"
+              name="Sales Reporting"
+              parent="sha_dynamic_sales_report_menu"
+              action="action_salesperson_report"
+              sequence="10"/>
+
+</odoo>
